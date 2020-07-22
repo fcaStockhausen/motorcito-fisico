@@ -50,17 +50,12 @@ GRAVEDAD = (10, 3*math.pi/2)
 ELASTICIDAD = 1
 DRAGG = 1
 
-
-
-        
-
-
 class Particula:
-
     ''' Particula '''
     # Fuerzas Sobre el Particula
-    vectorFuerzas = [0, 0]
-    def __init__(self, masa, velocidad, coords_px, sizeObj, color):
+    # vectorFuerzas = [0, 0]
+    vector_fuerzas_externas = Vector2D([0, 0])
+    def __init__(self, masa, velocidad, coords_px, sizeObj, color, fuerza_interna = Vector2D([0, 0])):
         self.masa = masa #
         self.velocidad = velocidad # (r, theta)
         self.size = int(sizeObj)
@@ -73,12 +68,12 @@ class Particula:
         #self.rect = self.image.get_rect()
         self.x = coords_px[0]
         self.y = coords_px[1]
+        self.fuerza_interna = fuerza_interna
         #self.largo = largo
         #self.ancho = ancho
     
     def display(self):
         pygame.draw.circle(mundo.pantalla, self.color, [int(self.x), int(self.y)] , self.size)
-
 
     def update(self, dt_s):
         '''Updatear el estado de la bola'''
@@ -98,20 +93,18 @@ class Particula:
         
         self.calculaMovimiento(dt_s)
         self.colision()
-
         
         #if self.velocidad[0]<0.09:
         #    self.velocidad[0]=1
        
         
-        self.vectorFuerzas = [0, 0]
-
+        self.vector_fuerzas_externas.x, self.vector_fuerzas_externas.y = [0, 0]
 
     def calcGrav(self):
-        self.vectorFuerzas = sumaFuerzas(self.vectorFuerzas, [0, 10*self.masa])
+        self.vector_fuerzas_externas += Vector2D([0, 10*self.masa])
 
     def fuerzaViento(self, viento):
-        self.vectorFuerzas = sumaFuerzas(self.vectorFuerzas, transformaCartesiano(viento))
+        self.vector_fuerzas_externas += Vector2D(transformaCartesiano(viento))
     
     def colision(self):
         #Colision derecha
@@ -119,7 +112,6 @@ class Particula:
             self.x = 2*(LARGO-self.size)-self.x
             self.velocidad[1] = math.pi - self.velocidad[1]
             #self.velocidad[0] = self.velocidad[0]*ELASTICIDAD #Inelastico
-            
             
         #Colision izquierda
         if  self.x <= self.size:
@@ -136,11 +128,11 @@ class Particula:
         #colision arriba
         if  self.y <= self.size :
             self.y = 2*self.size - self.y
-            self.velocidad[1] =   - self.velocidad[1]
+            self.velocidad[1] = - self.velocidad[1]
             #self.velocidad[0] = self.velocidad[0]*ELASTICIDAD #Inelastico
 
     def dragg(self):
-        self.velocidad[0]*=DRAGG
+        self.velocidad[0] *= DRAGG
             
     
     def calculaMovimiento(self, dt_s):
@@ -149,17 +141,18 @@ class Particula:
         # RECALCULAR TODAS LAS VELOCIDADES
         # USANDO dt_s
 
-        # V_f = dt_s 
-       
-            
-        accelx, accely  = [self.vectorFuerzas[0]/(self.masa), self.vectorFuerzas[1]/(self.masa)]
+        # V_f = dt_s
+        f1 = self.vector_fuerzas_externas.x
+        f2 = self.vector_fuerzas_externas.y
+
+        accelx, accely = [f1/(self.masa), f2/(self.masa)]
         
 
         # V cartesiano = V_Objeto 
         vCarte = transformaCartesiano(self.velocidad)
         
         # Vfinal = V_act + a*Dt
-        vFinal = [vCarte[0] + accelx*dt_s, vCarte[1] + accely*dt_s]
+        vFinal = [vCarte[0] + accelx * dt_s, vCarte[1] + accely * dt_s]
 
         # Velocidad promedio
         vProm = sumaFuerzas(vFinal, vCarte)
@@ -171,12 +164,26 @@ class Particula:
 
 
         self.velocidad = transformaAngular(vFinal)
-        
         self.dragg()
 
+class Hoover(Particula):
+    ''' Hoover '''
+    def fire_thrusters(self, vector_dist):
+        self.fuerza_interna.set_misma_direccion(vector_dist)
+        self.vector_fuerzas_externas = self.vector_fuerzas_externas + self.fuerza_interna
+
+    def estabilizar(self, coords_px):
+        vector_dist = self.vector_dist(coords_px)
+        print([vector_dist.x, vector_dist.y])
+        self.fire_thrusters(vector_dist)
+
+    def vector_dist(self, coords_px):
+        return Vector2D([coords_px[0] - self.x, coords_px[1] - self.y])
+
+    
 
 class Mundo:
-    def __init__ (self, tamanoPantalla, m_per_px , px_per_m, color=THECOLORS["black"]):
+    def __init__(self, tamanoPantalla, m_per_px, px_per_m, color=THECOLORS["black"]):
         self.ancho_px, self.alto_px = tamanoPantalla
         self.m_per_px = float(m_per_px)
         self.px_per_m = int(px_per_m)
@@ -185,9 +192,6 @@ class Mundo:
         self.viento_on = 0
         self.gravedad_on = 0
 
-        
-        
-    
     def init_pantalla(self):
         self.pantalla = pygame.display.set_mode([self.ancho_px, self.alto_px])
      
@@ -198,8 +202,8 @@ class Mundo:
     
     def get_user_input(self):
         for event in pygame.event.get():
-            if (event.type == pygame.QUIT): 
-                    termina = 1
+            if (event.type == pygame.QUIT):
+                termina = 1
             elif (event.type == pygame.KEYDOWN):
                 if event.key == K_1:
                     return 1
@@ -207,6 +211,8 @@ class Mundo:
                     return 2
                 if event.key == K_3:
                     return 3
+                if event.key == K_4:
+                    return 4
                 if event.key == K_o:
                     return 'o'
                 if event.key == K_ESCAPE:
@@ -227,6 +233,9 @@ class Mundo:
 
     def crea_particula(self, mouse_pos):
         self.coleccion_particulas.append(Particula(10, [0, 0], mouse_pos, 10*self.px_per_m, THECOLORS['white']))
+
+    def crea_hoover(self, mouse_pos):
+        self.coleccion_particulas.append(Hoover(10, [0, 0], mouse_pos, 5*self.px_per_m, THECOLORS['red'], Vector2D([10, 10])))
 
     def mostrar_stats(self):
         font = pygame.font.SysFont('comicsans', 20)
@@ -312,6 +321,7 @@ def main():
     mundo.crear_particulas(2, 20)
     
     termina = 0
+    retraso = 0
     while not termina:
         #Borrar todo
         mundo.update_pantalla()
@@ -331,6 +341,9 @@ def main():
             mundo.gravedad_on = 1
         elif user_input == 3:
             mundo.viento_on = 1
+        elif user_input == 4:
+            mouse_pos = pygame.mouse.get_pos()
+            mundo.crea_hoover(mouse_pos)
         elif user_input == 's':
             mundo.mostrar_stats_on = 1
 
@@ -341,7 +354,7 @@ def main():
         #    elif user_input == 1: #
         #        print(user_input)
         #        mundo.crea_particula(mouse_pos) # que caracteristicas? HACER SUBMENUU
-        #    elif user_input == 2:
+        #    elif user_input == 2:g
         #        print(user_input)
  
 
@@ -352,38 +365,23 @@ def main():
         
         for i, particula in enumerate(mundo.coleccion_particulas):
             particula.display()
+            if isinstance(particula, Hoover):
+                if retraso >= 1:
+                    print(retraso)
+                    particula.estabilizar(pygame.mouse.get_pos())
+                #print("HOLA")
             particula.update(dt_s)
             #print(particula.velocidad)¡
             for particula2 in mundo.coleccion_particulas[i+1:]:
                 detectorColision(particula, particula2)
-
         
         tiempo_s += dt_s
-        pygame.display.flip()   
+        retraso += dt_s
+        if retraso > 2:
+            #print(retraso)
+            retraso = retraso%1
+
+        pygame.display.flip()
         #180
-
-
-
-    #tamanoPantalla = (LARGO, ALTO)
-    #PANTALLA = pygame.display.set_mode(tamanoPantalla)
-    #PANTALLA.fill((100, 0, 100))
-    #
-    #particulas = []
-    #sumador = 0
-    #numero_de_particulas =  10
-    #for n in range(numero_de_particulas):
-    #    sizePart = 10
-    #    x = random.randint(sizePart, LARGO-sizePart)
-    #    y = random.randint(sizePart, ALTO-sizePart)
-    #    #x = 150 
-    #    #y = 0 + sumSador
-    #    #rVelocidad = random.randint(20, 30)
-    #    #rVelocidad = 0
-    #    #thetaVelocidad = random.uniform(0,2*math.pi)
-    #    masaP = random.randint(1, 10)
-    #    colorP = (random.randint(30, 255), random.randint(30, 255), random.randint(30,255))
-    #
-    #    sumador = sumador + sizePart*4
-    #    particulas.append(Particula(masaP, [rVelocidad, thetaVelocidad], colorP, [int(x), int(y)], sizePart))
 
 main()
