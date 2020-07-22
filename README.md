@@ -2,6 +2,11 @@
 
 Pequeño motorcito fisico, inspirado en ejemplos de google. Hecho como ejercicio personal
 
-Objetivo: Que sirva para ejemplificar fenomenos físicos simples en un futuro
+## Objetivo 
+Que sirva para ejemplificar fenomenos físicos simples en un futuro
+
+### Requisitos
+- Python 3
+- Pygame
 
 
